@@ -1,0 +1,119 @@
+---
+// Stacked-looking overlapping area chart (like the "adoption rate by experience level" chart):
+// three series drawn largest-first so all three remain visible, with direct end labels.
+import { capacityTicks, capacitySeries } from '../data';
+
+const W = 1400, H = 560;
+const padL = 60, padR = 200, padT = 40, padB = 50;
+const innerW = W - padL - padR, innerH = H - padT - padB;
+const yMax = 80;
+const n = capacityTicks.length;
+const x = (i: number) => padL + (i / (n - 1)) * innerW;
+const y = (v: number) => padT + innerH - (v / yMax) * innerH;
+
+// smooth monotone-ish path via Catmull-Rom → cubic bezier
+function linePath(vals: number[]) {
+  const pts = vals.map((v, i) => [x(i), y(v)]);
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C${c1x},${c1y} ${c2x},${c2y} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
+const series = capacitySeries.map((s) => ({
+  ...s,
+  line: linePath(s.values),
+  area: `${linePath(s.values)} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`,
+  endY: y(s.values[n - 1]),
+  endV: s.values[n - 1],
+}));
+// draw largest last value first so smaller series sit on top
+const order = [...series].sort((a, b) => b.endV - a.endV);
+const yTicks = [20, 40, 60, 80];
+---
+<figure class="chart" data-chart="area" aria-labelledby="area-title">
+  <div class="chart__head">
+    <div>
+      <h3 id="area-title" class="display--s chart__title">Contracted capacity energized,<br />by site size</h3>
+      <ul class="legend" aria-hidden="true">
+        {capacitySeries.map((s) => (
+          <li><i style={`background:${s.color}`}></i>{s.label}</li>
+        ))}
+      </ul>
+    </div>
+    <div class="chart__tools">
+      <button class="tool tool--round" type="button" aria-label="How to read this chart" title="Share of contracted MW energized at each point in time">?</button>
+      <a class="tool" href="/media/day.jpg" download>Download image</a>
+    </div>
+  </div>
+
+  <svg class="chart__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Line chart of capacity energized by site size over three years">
+    <defs>
+      <clipPath id="area-reveal">
+        <rect class="reveal-rect" x={padL} y="0" width="0" height={H} />
+      </clipPath>
+    </defs>
+    <g class="grid">
+      {yTicks.map((t) => (
+        <g>
+          <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} />
+          <text x={padL - 12} y={y(t) + 4} text-anchor="end">{t}%</text>
+        </g>
+      ))}
+      {capacityTicks.map((t, i) => (
+        <g>
+          <line x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} />
+          <text x={x(i)} y={padT - 16} text-anchor="middle">{t}</text>
+        </g>
+      ))}
+    </g>
+    <g clip-path="url(#area-reveal)">
+      {order.map((s) => (
+        <g>
+          <path d={s.area} fill={s.color} fill-opacity="0.92" />
+          <path d={s.line} fill="none" stroke={s.color} stroke-width="2" />
+        </g>
+      ))}
+    </g>
+    <g class="end-labels">
+      {series.map((s, i) => (
+        <g transform={`translate(${x(n - 1) + 14}, ${s.endY})`}>
+          <g class="end-label" style={`--d:${i * 0.08}s`}>
+            <rect x="0" y="-16" rx="16" height="32" width={s.label.length * 8.6 + 72} fill="#faf9f6" />
+            <circle cx="16" cy="0" r="5" fill={s.color} />
+            <text x="28" y="5">{s.label} — {s.endV}%</text>
+          </g>
+        </g>
+      ))}
+    </g>
+  </svg>
+  <table class="sr-only">
+    <caption>Contracted capacity energized by site size</caption>
+    <thead><tr><th>Period</th>{capacitySeries.map((s) => <th>{s.label}</th>)}</tr></thead>
+    <tbody>
+      {capacityTicks.map((t, i) => (
+        <tr><td>{t}</td>{capacitySeries.map((s) => <td>{s.values[i]}%</td>)}</tr>
+      ))}
+    </tbody>
+  </table>
+</figure>
+
+<style>
+  .chart { margin: 0; position: relative; }
+  .chart__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+  .chart__title { margin: 0 0 20px; }
+  .legend { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+  .chart__tools { display: flex; gap: 8px; align-items: center; }
+  .tool { height: 36px; padding: 0 16px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; }
+  .tool--round { width: 36px; padding: 0; justify-content: center; background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-3); }
+  .chart__svg { width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: rgba(20, 20, 20, 0.14); stroke-width: 1; }
+  .grid text { font-family: var(--font-mono); font-size: 12px; fill: var(--ink-3); }
+  .end-label text { font-family: var(--font-sans); font-weight: 500; font-size: 16px; fill: var(--ink); }
+  .end-label { opacity: 0; transform-box: fill-box; transform-origin: left center; transform: translateX(-10px); transition: opacity 0.5s ease var(--d), transform 0.5s ease var(--d); }
+  .chart.is-complete .end-label { opacity: 1; transform: none; }
+</style>
