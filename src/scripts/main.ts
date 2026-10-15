@@ -127,7 +127,7 @@ function reveals() {
     const ems = el.querySelectorAll('em');
     const tl = gsap.timeline({ paused: true }).to(ems, { y: 0, duration: 1.1, stagger: 0.09, ease: 'power4.out' });
     if (el.closest('.hero')) tl.play(0.1);
-    else ScrollTrigger.create({ trigger: el, start: 'top 85%', onEnter: () => tl.play(), onLeaveBack: () => tl.reverse() });
+    else ScrollTrigger.create({ trigger: el.closest('section') || el, start: 'top 60%', onEnter: () => tl.play(), onLeaveBack: () => tl.reverse() });
   });
   gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach((el) => {
     gsap.fromTo(el, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 85%', toggleActions: 'play none none reverse' } });
@@ -194,11 +194,20 @@ function chrome() {
   const top = document.querySelector('[data-topnav]');
   const rail = document.querySelector('[data-rail]');
   ScrollTrigger.create({ trigger: '.hero', start: '40% top', onEnter: () => { top?.classList.add('is-visible'); rail?.classList.add('is-visible'); }, onLeaveBack: () => { top?.classList.remove('is-visible'); rail?.classList.remove('is-visible'); } });
-  document.querySelectorAll<HTMLElement>('[data-chapter-start]').forEach((sec) => {
-    const id = sec.dataset.chapterStart!;
-    const set = () => rail?.querySelectorAll('a').forEach((a) => a.classList.toggle('is-active', (a as HTMLElement).dataset.chapter === id));
-    ScrollTrigger.create({ trigger: sec, start: 'top 50%', end: 'bottom 50%', onEnter: set, onEnterBack: set });
-  });
+  // active chapter = last chapter start above the viewport midline
+  const starts = Array.from(document.querySelectorAll<HTMLElement>('[data-chapter-start]'));
+  const links = Array.from(rail?.querySelectorAll<HTMLElement>('a') || []);
+  let active = '';
+  const update = () => {
+    const mid = scrollY + innerHeight * 0.5;
+    let id = starts[0]?.dataset.chapterStart || '';
+    for (const s of starts) if (s.offsetTop <= mid) id = s.dataset.chapterStart!;
+    if (id === active) return;
+    active = id;
+    links.forEach((a) => a.classList.toggle('is-active', a.dataset.chapter === id));
+  };
+  ScrollTrigger.create({ trigger: document.body, start: 0, end: 'max', onUpdate: update });
+  update();
 }
 
 export function init() {

@@ -24,7 +24,8 @@ export const nav = [
 
 // Orb cards: 30 slots cycling through six site photographs
 export const cardImages = ['snow', 'desert', 'harbour', 'farm', 'valley', 'rooftop'];
-export const orbCards = Array.from({ length: 30 }, (_, i) => ({
+export const ORB_COUNT = 48;
+export const orbCards = Array.from({ length: ORB_COUNT }, (_, i) => ({
   src: `/media/card-${cardImages[i % cardImages.length]}.jpg`,
   alt: 'Modular site',
 }));
